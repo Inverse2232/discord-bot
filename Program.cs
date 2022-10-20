@@ -1,4 +1,4 @@
-﻿using Discord;
+using Discord;
 using Discord.Interactions;
 using Discord.Rest;
 using Discord.WebSocket;
@@ -19,6 +19,7 @@ using System.Net;
 using System.Collections.ObjectModel;
 using System.Runtime.Remoting.Messaging;
 using static System.Net.Mime.MediaTypeNames;
+using System.Security.Cryptography;
 
 namespace DiscordBot
 {
@@ -32,6 +33,7 @@ namespace DiscordBot
         ulong serverID = 1015024187716403230;
         ulong rolesMessage = 1;
         ulong categoryTickets = 1020448455719665745;
+        ulong botID = 1019368036811149424;
         SocketRole roleRP;
         SocketRole roleERP;
         SocketRole roleNSFW;
@@ -71,7 +73,7 @@ namespace DiscordBot
             _client.SlashCommandExecuted += OnSlashCommandExecuted;
             _client.ModalSubmitted += OnModalSubmitted;
 
-            var token = "";
+            var token = "MTAxOTM2ODAzNjgxMTE0OTQyNA.GgaZp-.IoxZ8XWBR7Emao5yhma0OOolaHWlFDujqkYauE";
 
             await _client.LoginAsync(TokenType.Bot, token);
             await _client.StartAsync();
@@ -143,7 +145,64 @@ namespace DiscordBot
             string link = components.First(x => x.CustomId == "link").Value;
 
 
-            if (link.Length != 19)
+            if (modal.Data.CustomId == "bot_giveaway")
+            {
+                if (title != "" || description != "")
+                {
+
+                    var author = new EmbedAuthorBuilder()
+                    .WithName("Wild Dreams Host Club")
+                    .WithIconUrl(_main.GetUser(botID).GetAvatarUrl());
+
+                    var embed = new EmbedBuilder { };
+                    embed.WithColor(Discord.Color.Blue)
+                    //.WithAuthor(author)
+                    .WithTitle(title)
+                    .WithDescription(description)
+                    .WithFooter(footer => footer.Text = "React below with 🎉 below to participate in the giveaway 💗");
+                    await modal.Channel.SendMessageAsync("", false, embed.Build());
+
+                    await Task.Delay(100);
+
+                    var messages = await modal.Channel.GetMessagesAsync(1).FlattenAsync();
+                    await messages.First().AddReactionAsync(new Emoji("🎉"));
+
+                    ulong messageID = messages.First().Id;
+
+                    var embedLogs = new EmbedBuilder { };
+                    embedLogs.WithColor(Discord.Color.Blue)
+                    .WithAuthor(author)
+                    .WithTitle("Giveaway: " + title)
+                    .WithFooter(footer => footer.Text = "Choose a random winner with the button below 💗");
+                    //.WithFooter(footer => footer.Text = "💗 " + user.Mention);
+                    await channelLogs.SendMessageAsync("", false, embedLogs.Build());
+
+                    var buttonClose = new ButtonBuilder()
+                    {
+                        Label = "Choose winner",
+                        CustomId = "buttonWinner",
+                        Style = ButtonStyle.Success,
+                    };
+                    var component = new ComponentBuilder();
+                    component.WithButton(buttonClose);
+                    await channelLogs.SendMessageAsync(" ", false, components: component.Build());
+
+                    await channelLogs.SendMessageAsync(modal.Channel.Id.ToString());
+                    await channelLogs.SendMessageAsync(messages.First().Id.ToString());
+
+                }
+
+                if (link != "")
+                {
+                    await modal.Channel.SendMessageAsync(link);
+                }
+
+                await modal.RespondAsync("Giveaway started", null, false, true);
+                return;
+            }
+
+
+            if (modal.Data.CustomId == "bot_message")
             {
                 if (title != "" || description != "")
                 {
@@ -161,9 +220,10 @@ namespace DiscordBot
                 }
 
                 await modal.RespondAsync("Message sent", null, false, true);
+                return;
             }
             //
-            else
+            if (modal.Data.CustomId == "bot_modify")
             {
 
                 var msg = await modal.Channel.GetMessageAsync(Convert.ToUInt64(link));
@@ -172,11 +232,8 @@ namespace DiscordBot
                 {
 
                     await message.ModifyAsync(x =>
-
                     {
-
                         EmbedBuilder embed = new EmbedBuilder();
-
                         embed.WithColor(Discord.Color.Blue);
                         embed.WithTitle(title);
                         embed.WithDescription(description);
@@ -184,14 +241,12 @@ namespace DiscordBot
 
                     });
                 }
-
                 await modal.RespondAsync("Message edited", null, false, true);
-
+                return;
             }
         }
         private async Task OnSlashCommandExecuted(SocketSlashCommand arg)
         {
-
             if (arg.Data.Name == "message")
             {
                 // arg.RespondAsync("Opening message menu", null, false, true);
@@ -204,9 +259,7 @@ namespace DiscordBot
              .AddTextInput("Picture Link", "link", TextInputStyle.Paragraph, "", null, null, false, null);
 
                 await arg.RespondWithModalAsync(mb.Build());
-
             }
-
 
             if (arg.Data.Name == "modify")
             {
@@ -215,13 +268,25 @@ namespace DiscordBot
 
                 var mb = new ModalBuilder()
             .WithTitle("Edit message")
-            .WithCustomId("edit_message")
+            .WithCustomId("bot_modify")
             .AddTextInput("Title", "title", TextInputStyle.Paragraph, "Title", null, null, false, null)
              .AddTextInput("Description", "description", TextInputStyle.Paragraph, "Description", null, null, false, null)
              .AddTextInput("Message ID (Do not touch)", "link", TextInputStyle.Paragraph, result, 19, 19, false, result);
 
                 await arg.RespondWithModalAsync(mb.Build());
+            }
 
+            if (arg.Data.Name == "giveaway")
+            {
+                // arg.RespondAsync("Opening message menu", null, false, true);
+
+                var mb = new ModalBuilder()
+            .WithTitle("Bot giveaway")
+            .WithCustomId("bot_giveaway")
+            .AddTextInput("Title", "title", TextInputStyle.Paragraph, "Title", null, null, false, null)
+             .AddTextInput("Description", "description", TextInputStyle.Paragraph, "Description", null, null, false, null)
+             .AddTextInput("Picture Link", "link", TextInputStyle.Paragraph, "", null, null, false, null);
+                await arg.RespondWithModalAsync(mb.Build());
 
             }
 
@@ -258,19 +323,25 @@ namespace DiscordBot
             //await PurgeAsync(channelGlobal);
             //await _client.Rest.DeleteAllGlobalCommandsAsync();
 
+            var commandMessage = new SlashCommandBuilder()
+            .WithName("message")
+            .WithDescription("Send a message from within the bot.")
+            .WithDefaultMemberPermissions(GuildPermission.Administrator);
+            await _client.Rest.CreateGuildCommand(commandMessage.Build(), _main.Id);
 
-            var guildCommand = new SlashCommandBuilder()
-    .WithName("message")
-    .WithDescription("Send a message from within the bot.")
-    .WithDefaultMemberPermissions(GuildPermission.Administrator);
-            await _client.Rest.CreateGuildCommand(guildCommand.Build(), _main.Id);
+            var commandModify = new SlashCommandBuilder()
+            .WithName("modify")
+            .WithDescription("Edit a message sent by the bot.")
+            .AddOption("string", ApplicationCommandOptionType.String, "Enter message link", true)
+            .WithDefaultMemberPermissions(GuildPermission.Administrator);
+            await _client.Rest.CreateGuildCommand(commandModify.Build(), _main.Id);
 
-            var guildCommand2 = new SlashCommandBuilder()
-        .WithName("modify")
-        .WithDescription("Edit a message sent by the bot.")
-        .AddOption("string", ApplicationCommandOptionType.String, "Enter message link", true)
-.WithDefaultMemberPermissions(GuildPermission.Administrator);
-            await _client.Rest.CreateGuildCommand(guildCommand2.Build(), _main.Id);
+            var commandGiveaway = new SlashCommandBuilder()
+            .WithName("giveaway")
+            .WithDescription("Start a giveaway.")
+            .WithDefaultMemberPermissions(GuildPermission.Administrator);
+            await _client.Rest.CreateGuildCommand(commandGiveaway.Build(), _main.Id);
+
 
             var messages = await channelVerify.GetMessagesAsync(1).FlattenAsync();
             rolesMessage = messages.First().Id;
@@ -410,6 +481,46 @@ namespace DiscordBot
         {
             var which = arg.Data.CustomId;
 
+            if (which == "buttonWinner")
+            {
+                var test = arg.Message;
+                var test2 = arg.Message.Id;
+
+                var messages = await arg.Channel.GetMessagesAsync().FlattenAsync();
+                var messagesList = messages.ToList();
+                var result = messagesList.FindIndex(x => x.Id == test2);
+
+
+                SocketTextChannel messageGivewayChannel = _main.GetTextChannel(Convert.ToUInt64(messagesList[result - 1].Content));
+                var msg = await messageGivewayChannel.GetMessageAsync(Convert.ToUInt64(messagesList[result - 2].Content));
+
+
+                var possibleWinners = msg.GetReactionUsersAsync(new Emoji("🎉"), 3331);
+
+                var winners2 = possibleWinners.ToListAsync();
+
+                var count = winners2.Result.ElementAt(0).Count();
+                if (count == 1)
+                {
+                    await arg.RespondAsync("Can't choose winner (no reactions on giveaway)", null, false, true);
+                    return;
+
+                }
+
+            again:
+                Random random = new Random(); int randomID = random.Next(count);
+
+                var winner = winners2.Result.ElementAt(0).ElementAt(randomID);
+                if (winner.IsBot) goto again;
+
+                await messageGivewayChannel.SendMessageAsync(winner.Mention + " has won the Giveaway");
+                await arg.RespondAsync("Winner chosen (" + winner.Mention + ")", null, false, true);
+
+
+                //IUser test = winner.Result.;
+
+
+            }
             if (which == "buttonRules")
             {
 
@@ -430,7 +541,7 @@ namespace DiscordBot
             }
 
 
-            else if (which == "buttonClose")
+            if (which == "buttonClose")
             {
                 /*arg.RespondAsync("Ticket will be closed in 5 sec", null, false, true);
                 await Task.Delay(2000);
@@ -449,31 +560,25 @@ namespace DiscordBot
 
 
 
-               /* var capture = await test.GetMessagesAsync().FlattenAsync();
-                // var filteredMessages = capture.Where(x => (DateTimeOffset.UtcNow - x.Timestamp).TotalDays <= 14);
+                /* var capture = await test.GetMessagesAsync().FlattenAsync();
+                 // var filteredMessages = capture.Where(x => (DateTimeOffset.UtcNow - x.Timestamp).TotalDays <= 14);
 
-                var count = capture.Count();
+                 var count = capture.Count();
 
-                string logged = "";
-                foreach (var message in capture)
-                {
-                    logged += "\r\n[+] " + message.Author + " - " + message.Timestamp.ToString().Split('+')[0] + ": " + message.Content;
-                }
+                 string logged = "";
+                 foreach (var message in capture)
+                 {
+                     logged += "\r\n[+] " + message.Author + " - " + message.Timestamp.ToString().Split('+')[0] + ": " + message.Content;
+                 }
 
-                logged = string.Join("\n", logged.Split('\n').Reverse());
+                 logged = string.Join("\n", logged.Split('\n').Reverse());
 
-                await arg.Channel.SendMessageAsync(logged);*/
-
-
-
-
-
-
+                 await arg.Channel.SendMessageAsync(logged);*/
 
             }
 
 
-            else
+            if (which == "buttonVIP" || which == "buttonRoom" || which == "buttonHost" || which == "buttonOther")
             {
                 string username = arg.User.ToString().Split('#')[0].ToLower();
                 username = Regex.Replace(username, "[^a-zA-Z0-9]", "");

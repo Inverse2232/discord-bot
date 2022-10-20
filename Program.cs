@@ -73,7 +73,7 @@ namespace DiscordBot
             _client.SlashCommandExecuted += OnSlashCommandExecuted;
             _client.ModalSubmitted += OnModalSubmitted;
 
-            var token = "MTAxOTM2ODAzNjgxMTE0OTQyNA.GgaZp-.IoxZ8XWBR7Emao5yhma0OOolaHWlFDujqkYauE";
+            var token = "";
 
             await _client.LoginAsync(TokenType.Bot, token);
             await _client.StartAsync();
